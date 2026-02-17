@@ -1,37 +1,72 @@
-"""
-SQLAlchemy ORM models for users, appliances, and tariffs (placeholders).
-Define minimal models for development and migration scripts.
-"""
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-import datetime
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Time
+from sqlalchemy.orm import declarative_base, relationship
+from datetime import datetime
 
 Base = declarative_base()
 
-
+# ---------------- USERS ----------------
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    name = Column(String, nullable=True)
+    name = Column(String, nullable=False)
+
+    meters = relationship("Meter", back_populates="user")
+    appliances = relationship("Appliance", back_populates="user")
 
 
+# ---------------- METERS ----------------
+class Meter(Base):
+    __tablename__ = "meters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    user = relationship("User", back_populates="meters")
+    readings = relationship("MeterReading", back_populates="meter")
+
+
+# ---------------- METER READINGS ----------------
+class MeterReading(Base):
+    __tablename__ = "meter_readings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    meter_id = Column(Integer, ForeignKey("meters.id"))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    energy_kwh = Column(Float)
+
+    meter = relationship("Meter", back_populates="readings")
+
+
+# ---------------- APPLIANCES ----------------
 class Appliance(Base):
     __tablename__ = "appliances"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    name = Column(String, nullable=False)
-    power_watts = Column(Float, nullable=False, default=0.0)
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    name = Column(String)
+    power_kw = Column(Float)
     is_on = Column(Boolean, default=False)
 
+    user = relationship("User", back_populates="appliances")
 
+
+# ---------------- TARIFFS ----------------
 class Tariff(Base):
     __tablename__ = "tariffs"
 
     id = Column(Integer, primary_key=True, index=True)
-    start = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    end = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
-    price_per_kwh = Column(Float, nullable=False, default=0.0)
+    start_time = Column(Time)
+    end_time = Column(Time)
+    price_per_unit = Column(Float)
 
+
+# ---------------- SCHEDULES ----------------
+class Schedule(Base):
+    __tablename__ = "schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    appliance_id = Column(Integer, ForeignKey("appliances.id"))
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)

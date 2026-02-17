@@ -1,6 +1,10 @@
 from fastapi import FastAPI,Depends
 from sqlalchemy.orm import Session
 from db.session import get_db
+from db.session import engine
+from db.models import Base
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="wattwise backend")
 
