@@ -1,24 +1,37 @@
-"""
-API endpoints for live meter data.
-Placeholder routes for fetching current and historical meter readings.
-"""
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from db.session import get_db
+from db.models import MeterReading
+from sqlalchemy import desc
+from datetime import datetime, timedelta
 
-from ..schemas.meter import MeterReading
-
-router = APIRouter()
+router = APIRouter(prefix="/meter", tags=["Meter"])
 
 
-@router.get("/current", response_model=MeterReading)
-async def get_current_meter_reading():
-    """Return the latest meter reading (placeholder)."""
-    # Placeholder response
-    return MeterReading(timestamp="2026-01-01T00:00:00Z", watts=0.0)
+@router.get("/live")
+def get_live_meter(db: Session = Depends(get_db)):
+    # latest reading
+    latest = (
+        db.query(MeterReading)
+        .order_by(desc(MeterReading.timestamp))
+        .first()
+    )
 
+    if not latest:
+        return {"message": "No readings yet"}
 
-@router.get("/history", response_model=List[MeterReading])
-async def get_meter_history(limit: int = 100):
-    """Return historical meter readings (placeholder)."""
-    return []
+    # last 1 hour usage
+    one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+    readings = (
+        db.query(MeterReading)
+        .filter(MeterReading.timestamp >= one_hour_ago)
+        .all()
+    )
 
+    total_kwh = sum(r.energy_kwh for r in readings)
+
+    return {
+        "current_reading": latest.energy_kwh,
+        "timestamp": latest.timestamp,
+        "last_hour_consumption": round(total_kwh, 3)
+    }

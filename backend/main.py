@@ -7,12 +7,15 @@ from db.session import SessionLocal
 from db.seed import seed_data
 import threading
 import time
+from api.meter import router as meter_router
+
+
 from services.meter_simulator import generate_reading
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="wattwise backend")
-
+app.include_router(meter_router)
 @app.get("/")
 def health_check():
     return {"status":"wattwise backend is running"}
