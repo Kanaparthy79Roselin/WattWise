@@ -1,7 +1,4 @@
-Here’s a **clear, in-depth README.md** written so **you, your teammates, and judges** can understand the project without any prior smart-meter or IoT knowledge.
-You can copy-paste this directly.
 
----
 
 # ⚡ GridFlow — Smart Energy Optimization Super App (PoC)
 
