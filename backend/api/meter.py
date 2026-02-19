@@ -1,51 +1,54 @@
-from fastapi import APIRouter, Depends
+from fastapi import FastAPI,Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from db.session import get_db
-from db.models import MeterReading
-from sqlalchemy import desc
-from datetime import datetime, timedelta
-import pytz
+from db.session import engine
+from db.models import Base
+from db.session import SessionLocal
+from db.seed import seed_data
+import threading
+import time
+from api.meter import router as meter_router
+from api.appliances import router as appliances_router
+from api.tariffs import router as tariff_router
+from services.meter_simulator import generate_reading
 
-IST = pytz.timezone("Asia/Kolkata")
+Base.metadata.create_all(bind=engine)
 
-router = APIRouter(prefix="/meter", tags=["Meter"])
+app = FastAPI(title="wattwise backend")
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@router.get("/live")
-def get_live_meter(db: Session = Depends(get_db)):
-    latest = (
-        db.query(MeterReading)
-        .order_by(desc(MeterReading.timestamp))
-        .first()
-    )
+app.include_router(meter_router)
+app.include_router(tariff_router)
+app.include_router(appliances_router)
+@app.get("/")
+def health_check():
+    return {"status":"wattwise backend is running"}
 
-    if not latest:
-        return {"message": "No readings yet"}
+@app.get("/db-check")
+def db_check(db: Session = Depends(get_db)):
+    return {"db": "connected"}
 
-    # last 60 minutes graph
-    now = datetime.now(IST)
-    one_hour_ago = now - timedelta(hours=1)
-    readings = (
-        db.query(MeterReading)
-        .filter(MeterReading.timestamp >= one_hour_ago)
-        .order_by(MeterReading.timestamp)
-        .all()
-    )
+@app.on_event("startup")
+def startup_event():
+    db = SessionLocal()
+    seed_data(db)
+    db.close()
 
-    graph = [
-        {"time": (IST.localize(r.timestamp) if r.timestamp.tzinfo is None else r.timestamp.astimezone(IST)).isoformat(), "kwh": r.energy_kwh}
-        for r in readings
-    ]
+def meter_loop():
+    while True:
+        generate_reading()
+        time.sleep(15)  # demo speed (15 sec instead of 15 min)
 
-    # today usage
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_readings = db.query(MeterReading).filter(MeterReading.timestamp >= today_start).all()
-    today_usage = sum(r.energy_kwh for r in today_readings)
-
-    return {
-        "current_kwh": latest.energy_kwh,
-        "current_kw": round(latest.energy_kwh * 4, 2),  # 15min → kW approx
-        "today_kwh": round(today_usage, 3),
-        "graph": graph
-    }
-
+@app.on_event("startup")
+def start_simulator():
+    thread = threading.Thread(target=meter_loop, daemon=True)
+    thread.start()
