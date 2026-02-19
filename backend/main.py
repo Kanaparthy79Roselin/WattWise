@@ -10,14 +10,14 @@ import threading
 import time
 from api.meter import router as meter_router
 from api.appliances import router as appliances_router
-
+from api.tariffs import router as tariff_router
 from services.meter_simulator import generate_reading
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="wattwise backend")
 
-# Configure CORS
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
@@ -25,8 +25,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(meter_router)
 
+app.include_router(meter_router)
+app.include_router(tariff_router)
 app.include_router(appliances_router)
 @app.get("/")
 def health_check():
