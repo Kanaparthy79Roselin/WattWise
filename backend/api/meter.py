@@ -1,54 +1,116 @@
-from fastapi import FastAPI,Depends
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from db.session import get_db
-from db.session import engine
-from db.models import Base
-from db.session import SessionLocal
-from db.seed import seed_data
-import threading
-import time
-from api.meter import router as meter_router
-from api.appliances import router as appliances_router
-from api.tariffs import router as tariff_router
-from services.meter_simulator import generate_reading
+from db.models import MeterReading, Meter
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
-Base.metadata.create_all(bind=engine)
+IST = ZoneInfo("Asia/Kolkata")
 
-app = FastAPI(title="wattwise backend")
+def now_ist():
+    return datetime.now(IST)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter(prefix="/meter", tags=["Meter"])
 
-app.include_router(meter_router)
-app.include_router(tariff_router)
-app.include_router(appliances_router)
-@app.get("/")
-def health_check():
-    return {"status":"wattwise backend is running"}
 
-@app.get("/db-check")
-def db_check(db: Session = Depends(get_db)):
-    return {"db": "connected"}
+@router.get("/readings")
+def get_meter_readings(db: Session = Depends(get_db)):
+    """Get all meter readings"""
+    readings = db.query(MeterReading).all()
 
-@app.on_event("startup")
-def startup_event():
-    db = SessionLocal()
-    seed_data(db)
-    db.close()
+    return [
+        {
+            "id": r.id,
+            "meter_id": r.meter_id,
+            "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+            "energy_kwh": r.energy_kwh
+        }
+        for r in readings
+    ]
 
-def meter_loop():
-    while True:
-        generate_reading()
-        time.sleep(15)  # demo speed (15 sec instead of 15 min)
 
-@app.on_event("startup")
-def start_simulator():
-    thread = threading.Thread(target=meter_loop, daemon=True)
-    thread.start()
+@router.get("/readings/{meter_id}")
+def get_meter_readings_by_id(meter_id: int, db: Session = Depends(get_db)):
+    """Get readings for a specific meter"""
+    readings = db.query(MeterReading).filter(MeterReading.meter_id == meter_id).all()
+
+    if not readings:
+        return {"message": "No readings found for this meter"}
+
+    return [
+        {
+            "id": r.id,
+            "meter_id": r.meter_id,
+            "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+            "energy_kwh": r.energy_kwh
+        }
+        for r in readings
+    ]
+
+
+@router.get("/today-usage/{meter_id}")
+def get_today_usage(meter_id: int, db: Session = Depends(get_db)):
+    """Get today's energy usage for a meter"""
+    today_start = datetime.combine(now_ist().date(), datetime.min.time()).replace(tzinfo=IST)
+    today_end = now_ist()
+
+    readings = db.query(MeterReading).filter(
+        MeterReading.meter_id == meter_id,
+        MeterReading.timestamp >= today_start,
+        MeterReading.timestamp <= today_end
+    ).all()
+
+    total_kwh = sum(r.energy_kwh for r in readings) if readings else 0
+
+    return {
+        "meter_id": meter_id,
+        "date": now_ist().date().isoformat(),
+        "total_energy_kwh": round(total_kwh, 2),
+        "reading_count": len(readings)
+    }
+
+
+@router.get("/weekly-usage/{meter_id}")
+def get_weekly_usage(meter_id: int, db: Session = Depends(get_db)):
+    """Get weekly energy usage for a meter"""
+    today = now_ist()
+    week_start = today - timedelta(days=7)
+
+    readings = db.query(MeterReading).filter(
+        MeterReading.meter_id == meter_id,
+        MeterReading.timestamp >= week_start,
+        MeterReading.timestamp <= today
+    ).all()
+
+    total_kwh = sum(r.energy_kwh for r in readings) if readings else 0
+
+    return {
+        "meter_id": meter_id,
+        "period": f"{(week_start).date()} to {today.date()}",
+        "total_energy_kwh": round(total_kwh, 2),
+        "average_daily_kwh": round(total_kwh / 7, 2) if total_kwh > 0 else 0,
+        "reading_count": len(readings)
+    }
+
+
+@router.get("/monthly-usage/{meter_id}")
+def get_monthly_usage(meter_id: int, db: Session = Depends(get_db)):
+    """Get monthly energy usage for a meter"""
+    today = now_ist()
+    month_start = today.replace(day=1)
+
+    readings = db.query(MeterReading).filter(
+        MeterReading.meter_id == meter_id,
+        MeterReading.timestamp >= month_start,
+        MeterReading.timestamp <= today
+    ).all()
+
+    total_kwh = sum(r.energy_kwh for r in readings) if readings else 0
+
+    return {
+        "meter_id": meter_id,
+        "period": f"{month_start.strftime('%B %Y')}",
+        "total_energy_kwh": round(total_kwh, 2),
+        "reading_count": len(readings)
+    }
+
