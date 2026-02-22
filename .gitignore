@@ -10,6 +10,7 @@ __pycache__/
 *.pyo
 *.pyd
 
+
 # virtual env
 .venv/
 
@@ -27,3 +28,10 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+ww/
+

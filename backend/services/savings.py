@@ -13,4 +13,3 @@ def estimate_cost(consumption_kwh: float, price_per_kwh: float) -> float:
 def estimate_co2(consumption_kwh: float, grams_per_kwh: float = 400.0) -> float:
     """Estimate CO2 emissions in grams (placeholder)."""
     return consumption_kwh * grams_per_kwh
-
