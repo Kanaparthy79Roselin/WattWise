@@ -175,26 +175,6 @@ def register_combined(request: CombinedRegistrationRequest, db: Session = Depend
         message="Registration successful! You are now logged in."
     )
 
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    # ✨ GENERATE JWT TOKEN INSTANTLY (NO LOGIN REQUIRED!)
-    access_token = create_access_token(new_user.id, new_user.username)
-
-    # Return user details with token
-    return RegisterWithTokenResponse(
-        id=new_user.id,
-        name=new_user.name,
-        username=new_user.username,
-        phone_number=new_user.phone_number,
-        consumer_number=new_user.consumer_number,
-        created_at=new_user.created_at,
-        access_token=access_token,
-        token_type="bearer",
-        message="Registration successful! You are now logged in."
-    )
-
 
 # ==================== LOGIN ENDPOINTS ====================
 
@@ -372,4 +352,3 @@ def logout(current_user: User = Depends(get_current_user)):
     return {
         "message": f"User {current_user.username} logged out successfully"
     }
-

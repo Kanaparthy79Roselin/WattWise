@@ -48,7 +48,7 @@ def startup_event():
 def meter_loop():
     while True:
         generate_reading()
-        time.sleep(15)  # demo speed (15 sec instead of 15 min)
+        time.sleep(15)
 
 @app.on_event("startup")
 def start_simulator():

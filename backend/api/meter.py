@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from db.session import get_db
-from db.models import MeterReading, Meter
+from db.models import MeterReading, Meter, User
+from api.auth import get_current_user
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/meter", tags=["Meter"])
 
 
 @router.get("/readings")
-def get_meter_readings(db: Session = Depends(get_db)):
+def get_meter_readings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get all meter readings"""
     readings = db.query(MeterReading).all()
 
@@ -30,7 +31,7 @@ def get_meter_readings(db: Session = Depends(get_db)):
 
 
 @router.get("/readings/{meter_id}")
-def get_meter_readings_by_id(meter_id: int, db: Session = Depends(get_db)):
+def get_meter_readings_by_id(meter_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get readings for a specific meter"""
     readings = db.query(MeterReading).filter(MeterReading.meter_id == meter_id).all()
 
@@ -49,7 +50,7 @@ def get_meter_readings_by_id(meter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/today-usage/{meter_id}")
-def get_today_usage(meter_id: int, db: Session = Depends(get_db)):
+def get_today_usage(meter_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get today's energy usage for a meter"""
     today_start = datetime.combine(now_ist().date(), datetime.min.time()).replace(tzinfo=IST)
     today_end = now_ist()
@@ -71,7 +72,7 @@ def get_today_usage(meter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/weekly-usage/{meter_id}")
-def get_weekly_usage(meter_id: int, db: Session = Depends(get_db)):
+def get_weekly_usage(meter_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get weekly energy usage for a meter"""
     today = now_ist()
     week_start = today - timedelta(days=7)
@@ -94,7 +95,7 @@ def get_weekly_usage(meter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/monthly-usage/{meter_id}")
-def get_monthly_usage(meter_id: int, db: Session = Depends(get_db)):
+def get_monthly_usage(meter_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get monthly energy usage for a meter"""
     today = now_ist()
     month_start = today.replace(day=1)
@@ -113,4 +114,3 @@ def get_monthly_usage(meter_id: int, db: Session = Depends(get_db)):
         "total_energy_kwh": round(total_kwh, 2),
         "reading_count": len(readings)
     }
-
